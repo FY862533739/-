@@ -1,0 +1,84 @@
+import urllib
+from urllib import parse
+import requests
+import re
+from PIL import Image
+from lxml import etree
+
+def FindGrade():
+    p1 = input("输入学号：")
+    p2 = input("输入密码：")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36'}
+    url = "http://172.16.0.30/default2.aspx"
+    s = requests.session()
+    r = s.get(url=url, headers=headers)
+    html = r.text
+    # 验证码
+    cheakcode_url = re.findall(r'alt="看不清，换一张"\s?src="(.*?)"', html)[0]
+    cheakcode_url = "http://172.16.0.30/"+cheakcode_url
+    response2 = s.get(url=cheakcode_url, headers=headers)
+    with open('code.jpg', 'wb') as fp:
+        fp.write(response2.content)
+    img = Image.open('code.jpg')
+    img.show()
+    try:
+        p3 = input("输入验证码：")
+        data = {
+            "__VIEWSTATE": "/wEPDwULLTE4MTQyODExMTJkZAkHHQ2nmHGKx+x7Xm/qBk2jCNYP",
+            "__EVENTVALIDATION": "/wEWDwK7vInHAgKl1bKzCQKM0rLrBgLs0fbZDAKEs66uBwK/wuqQDgKAqenNDQLN7c0VAuaMg+INAveMotMNAoznisYGArursYYIAt+RzN8IApObsvIHArWNqOoP9qsDKB8K4SZue8u9CTgb6RN06DU=",
+            "txtUserName": p1,
+            "Textbox1": "",
+            "TextBox2": p2,
+            "txtSecretCode": p3,
+            "RadioButtonList1": "(unable to decode value)",
+            "Button1": "",
+            "lbLanguage": "",
+            "hidPdrs": "",
+            "hidsc": ""
+            }
+        response3 = s.post(url=url, data=data, headers=headers)
+        str_xm = re.findall('<span\s?id="xhxm">(.*?)同学</span></em>', response3.text)
+        str_xm2 = urllib.parse.quote(str_xm[0])  # 编码转化
+        print(str_xm[0] + ":登陆成功")
+        url = "http://172.16.0.30/xsjxpj2.aspx?xh=" + p1 + "&xm=" + str_xm2 + "&gnmkdm=N121503"
+        headers["Referer"] = "http://172.16.0.30/xs_main.aspx?xh=%s&type=1" % p1
+        pl_all = s.get(url=url, headers=headers)
+        # 获取每个教师的url
+        pls_url = re.findall(r"window.open\('(.*?)','xsjxpj','toolbar=0,location=0,directories=0,status=0,menubar=0,scrollbars=1,resizable=1'\)", pl_all.text)
+        for i in pls_url:
+            m = "%s%s" % ("http://172.16.0.30/", i)
+            headers["Referer"] = m
+            pl_ones = s.post(url=m, headers=headers)
+            html = etree.HTML(pl_ones.text)
+            __EVENTVALIDATION = html.xpath("//input[@id='__EVENTVALIDATION']/@value")
+            __VIEWSTATE = html.xpath("//input[@id='__VIEWSTATE']/@value")
+            data = {
+                "__EVENTTARGET": "",
+                "__EVENTARGUMENT": "",
+                "__LASTFOCUS": "",
+                "__VIEWSTATE": __VIEWSTATE,
+                "__EVENTVALIDATION": __EVENTVALIDATION,
+                "DataGrid1$ctl02$txt_pf": 99.9,
+                "DataGrid1$ctl03$txt_pf": 99.9,
+                "DataGrid1$ctl04$txt_pf": 99.9,
+                "DataGrid1$ctl05$txt_pf": 99.9,
+                "DataGrid1$ctl06$txt_pf": 99.9,
+                "DataGrid1$ctl07$txt_pf": 99.9,
+                "DataGrid1$ctl08$txt_pf": 99.9,
+                "DataGrid1$ctl09$txt_pf": 99.9,
+                "DataGrid1$ctl10$txt_pf": 99.9,
+                "DataGrid1$ctl11$txt_pf": 99.9,
+                "txt_pjxx": "老师讲课幽默，关心同学，思路清晰，从老师的课上学到了很多新的知识点。".encode("GBK"),
+                "Button1": "老师讲课幽默，关心同学，思路清晰，从老师的课上学到了很多新的知识点。".encode("GBK"),
+                "TextBox1": "老师讲课幽默，关心同学，思路清晰，从老师的课上学到了很多新的知识点。".encode("GBK")
+            }
+            pl_one = s.post(url=m, headers=headers, data=data)
+            print(pl_one)
+    except:
+        hint = re.findall("alert\('(.*?)'\)", response3.text)[0]  # 错误提示
+        print("遇到错误：%s" % hint)
+if __name__ == "__main__":
+    while True:
+        FindGrade()
+        print("{:~^50}".format("继续?"))
